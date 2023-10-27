@@ -19,7 +19,7 @@ type Knot struct {
 var TailVisited map[Point]bool
 
 func NewRope(size int) Rope {
-	b := Rope{make([]Knot, size, size)}
+	b := Rope{make([]Knot, size)}
 	var prev *Knot
 
 	prev = nil
@@ -62,6 +62,7 @@ func (r *Knot) MoveHead(direction string, count int) {
 		if r.Next != nil {
 			r.Next.PullKnot()
 		}
+
 	}
 
 }
@@ -78,6 +79,8 @@ func (r *Knot) PullKnot() {
 	// fmt.Printf("%v: %v\n", r, d)
 	// var dx, dy int
 	// fmt.Println("dist: ", d)
+
+	/* // Doesn't work....
 	if d.X > 1 || d.X < -1 || d.Y > 1 || d.Y < -1 {
 		r.PreviousLocation.X = r.Location.X
 		r.PreviousLocation.Y = r.Location.Y
@@ -85,14 +88,34 @@ func (r *Knot) PullKnot() {
 		r.Location.Y = r.Prev.PreviousLocation.Y
 	} else {
 		return
+	} */
+	var dx, dy int
+
+	if d.X == 2 || d.X == -2 {
+		dx = d.X / 2
+		if d.Y > 0 {
+			dy = 1
+		} else if d.Y < 0 {
+			dy = -1
+		}
+	} else if d.Y == 2 || d.Y == -2 {
+		dy = d.Y / 2
+		if d.X > 0 {
+			dx = 1
+		} else if d.X < 0 {
+			dx = -1
+		}
 	}
 
-	// r.Location.X += dx
-	// r.Location.Y += dy
+	r.Location.X += dx
+	r.Location.Y += dy
 
 	if r.Next == nil {
-		fmt.Println("New tail: ", r.Location)
-		TailVisited[Point{r.Location.X, r.Location.Y}] = true
+		_, check := TailVisited[Point{r.Location.X, r.Location.Y}]
+		if !check {
+			fmt.Println("New tail: ", r.Location)
+			TailVisited[Point{r.Location.X, r.Location.Y}] = true
+		}
 	} else {
 		r.Next.PullKnot()
 	}
