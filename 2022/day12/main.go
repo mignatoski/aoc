@@ -107,6 +107,19 @@ func (g *Grid) H(n *Node) int {
 	return int(math.Abs(float64(n.X-g.End.X)) + math.Abs(float64(n.Y-g.End.Y)))
 }
 
+func (g Grid) Reset() {
+	for y := range g.Nodes {
+		for x := range g.Nodes[y] {
+			g.Nodes[y][x].Neighbors = nil
+			g.Nodes[y][x].IsOpen = false
+			g.Nodes[y][x].Visited = false
+			g.Nodes[y][x].GScore = math.MaxInt
+			g.Nodes[y][x].FScore = math.MaxInt
+			g.Nodes[y][x].Prev = nil
+		}
+	}
+}
+
 var FinalPath []*Node
 
 func (n *Node) PathBack() int {
@@ -116,7 +129,7 @@ func (n *Node) PathBack() int {
 	if n.Prev != nil {
 		score += 1 + n.Prev.PathBack()
 	}
-	fmt.Print("(", n.X, n.Y, ") -> ")
+	// fmt.Print("(", n.X, n.Y, ") -> ")
 	return score
 
 }
@@ -125,7 +138,7 @@ func (n *Node) PathBack() int {
 // 	c.Height
 // }
 
-func (g *Grid) CalculatePath() {
+func (g *Grid) CalculatePath() int {
 	// start = g.Nodes[g.sY][g.sX]
 	// end := g.Nodes[g.eY][g.eX]
 	FinalPath = make([]*Node, 0)
@@ -142,8 +155,7 @@ func (g *Grid) CalculatePath() {
 
 		current := openSet[0] // Lowest distance to start
 		if current.X == g.End.X && current.Y == g.End.Y {
-			fmt.Println("Score: ", current.PathBack())
-			break
+			return current.PathBack()
 		}
 		openSet = openSet[1:] // Remove current element
 		current.IsOpen = false
@@ -172,8 +184,8 @@ func (g *Grid) CalculatePath() {
 	// sort by lowest optimistic distance
 
 	// fmt.Println(g.Start, g.End)
-	fmt.Println(len(FinalPath))
-
+	// fmt.Println(len(FinalPath))
+	return math.MaxInt
 }
 
 func main() {
@@ -184,6 +196,7 @@ func main() {
 	var line string
 	var y int
 	grid := Grid{Nodes: make([][]Node, 0)}
+	potentialStartNodes := make([]*Node, 0)
 
 	// Build Grid
 	for fileScanner.Scan() {
@@ -206,6 +219,9 @@ func main() {
 				r = 'z'
 				grid.eX, grid.eY = x, y
 				grid.End = &n
+			case 'a':
+				n.Type = NORMAL
+				potentialStartNodes = append(potentialStartNodes, &n)
 			default:
 				n.Type = NORMAL
 			}
@@ -219,7 +235,17 @@ func main() {
 	grid.Height = len(grid.Nodes)
 
 	// Start Processing Path
-	grid.CalculatePath()
+	fmt.Println("Score: ", grid.CalculatePath())
 	fmt.Print(grid)
+
+	lowScore := math.MaxInt
+	for _, s := range potentialStartNodes {
+		grid.Reset()
+		grid.Start = s
+		grid.Start.GScore = 0
+		grid.Start.FScore = grid.H(grid.Start)
+		lowScore = min(lowScore, grid.CalculatePath())
+	}
+	fmt.Println("Low: ", lowScore)
 
 }
