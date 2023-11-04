@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
+	"strings"
 )
 
 type Pair struct {
@@ -31,7 +33,30 @@ func (pair *Pair) String() string {
 }
 
 func (packet *Packet) String() string {
-	return fmt.Sprintf("-- PACKET --\nList: %v\nValue: %v\n", len(packet.List), packet.Value)
+	var sb strings.Builder
+	cur := packet
+	switch cur.Type() {
+
+	case LIST:
+		sb.WriteRune('[')
+		for i := range cur.List {
+			sb.WriteString(cur.List[i].String())
+			if i != len(cur.List)-1 {
+				sb.WriteRune(',')
+			}
+		}
+		sb.WriteRune(']')
+
+	case NUMBER:
+		sb.WriteString(strconv.FormatInt(int64(cur.Value), 10))
+
+	default:
+		panic("shouldn't happen")
+
+	}
+
+	return sb.String()
+	// return fmt.Sprintf("-- PACKET --\nList: %v\nValue: %v\n", len(packet.List), packet.Value)
 }
 
 func (packet *Packet) Type() PacketType {
@@ -198,6 +223,7 @@ func main() {
 	indexSum := 0
 
 	pairs := make([]*Pair, 0)
+	allPackets := make([]*Packet, 0)
 	var pair *Pair
 
 	for fileScanner.Scan() {
@@ -210,10 +236,12 @@ func main() {
 			pair.Index = (lineCount / 3) + 1
 			pair.Left = BuildPacket(line[1 : len(line)-1])
 			pairs = append(pairs, pair)
+			allPackets = append(allPackets, pair.Left)
 
 		case 1:
 			pair.RightText = line
 			pair.Right = BuildPacket(line[1 : len(line)-1])
+			allPackets = append(allPackets, pair.Right)
 		case 2:
 			// do nothing, blank line
 			fmt.Println(pair)
@@ -230,10 +258,22 @@ func main() {
 
 	fmt.Println("Part 1 Sum of Indexes: ", indexSum)
 
-	p := Pair{}
-	p.Left = BuildPacket("[[[]]]")
-	p.Right = BuildPacket("[[[[[]]]]]")
+	allPackets = append(allPackets, BuildPacket("[[2]]"))
+	allPackets = append(allPackets, BuildPacket("[[6]]"))
 
-	fmt.Println(Compare(p.Left, p.Right))
+	sort.Slice(allPackets, func(i, j int) bool {
+		result := Compare(allPackets[i], allPackets[j])
+		if result == CORRECT {
+			return true
+		} else {
+			return false
+		}
+
+	})
+
+	for i, p := range allPackets {
+		fmt.Println(i+1, p)
+	}
+	// 104 * 198 = 20592
 
 }
