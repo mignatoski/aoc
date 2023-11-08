@@ -13,11 +13,11 @@ type Point struct {
 }
 
 type Section struct {
-	X1, X2 int
+	Lo, Hi int
 }
 
 func (s *Section) Length() int {
-	return 1 + s.X2 - s.X1
+	return 1 + s.Hi - s.Lo
 }
 
 type Sensor struct {
@@ -124,19 +124,19 @@ func main() {
 
 	}
 	sort.Slice(sections, func(i, j int) bool {
-		return sections[i].X1 < sections[j].X1
+		return sections[i].Lo < sections[j].Lo
 	})
 	fmt.Println(sections)
 
 	tmp := sections[0]
 	condensed := make([]Section, 0)
 	for _, v := range sections {
-		if v.X1 > tmp.X2 {
+		if v.Lo > tmp.Hi {
 			condensed = append(condensed, tmp)
 			tmp = v
 		}
-		if v.X2 > tmp.X2 {
-			tmp.X2 = v.X2
+		if v.Hi > tmp.Hi {
+			tmp.Hi = v.Hi
 		}
 	}
 	condensed = append(condensed, tmp)
@@ -151,7 +151,7 @@ func main() {
 	for k := range beacons {
 		if k.Y == 2_000_000 {
 			for _, v := range condensed {
-				if k.X >= v.X1 && k.X <= v.X2 {
+				if k.X >= v.Lo && k.X <= v.Hi {
 					nonBeaconCount--
 				}
 			}
