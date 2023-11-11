@@ -32,40 +32,47 @@ func CalcPressureAndTimeLeft(c, n *Valve, t int) (int, int) {
 	return pressureReleased, effectiveMinutes
 }
 
-func RecursiveValves2(remainingValves map[*Valve]int, cv1, cv2, nv1, nv2 *Valve, t1, t2 int) int {
+func RecursiveValves2(remainingValves map[*Valve]*int, cv1, cv2, nv *Valve, t1, t2, move int) int {
 	// copy map to prevent affecting other recursions
-	otherValvesRemaining := make(map[*Valve]int, 0)
-	for k, v := range remainingValves {
-		otherValvesRemaining[k] = v
+	otherValvesRemaining := make(map[*Valve]*int, 0)
+	var optimisticPressure int
+	for k := range remainingValves {
+		otherValvesRemaining[k] = &optimisticPressure
+		optimisticPressure += max(t1, t2) * k.FlowRate
 	}
-	delete(otherValvesRemaining, nv1) // remove self from map
-	delete(otherValvesRemaining, nv2) // remove self from map
+	delete(otherValvesRemaining, nv) // remove self from map
 
 	pressureReleased := 0
-	pr1, rt1 := CalcPressureAndTimeLeft(cv1, nv1, t1)
-	pr2, rt2 := CalcPressureAndTimeLeft(cv2, nv2, t2)
-	if pr1 > 0 {
-		pressureReleased += pr1
-	}
-	if pr2 > 0 {
-		pressureReleased += pr2
+	var rt1, rt2 int
+
+	if move == 1 {
+		pressureReleased, rt1 = CalcPressureAndTimeLeft(cv1, nv, t1)
+		rt2 = t2
+		cv1 = nv
+	} else {
+		pressureReleased, rt2 = CalcPressureAndTimeLeft(cv2, nv, t2)
+		rt1 = t1
+		cv2 = nv
 	}
 	if pressureReleased <= 0 {
 		return 0
 	}
 
-	var maxPressureReleased, npr int
+	var maxPressureReleased, npr1, npr2 int
 
-	for nextValve1 := range otherValvesRemaining {
-		for nextValve2 := range otherValvesRemaining {
-			if nextValve1 != nextValve2 {
-				npr = RecursiveValves2(otherValvesRemaining, nv1, nv2, nextValve1, nextValve2, rt1, rt2)
-				if npr > 0 {
-					maxPressureReleased = max(maxPressureReleased, npr)
-				}
+	for nextValve := range otherValvesRemaining {
+		if optimisticPressure > maxPressureReleased {
+
+			if rt1 > 0 {
+				npr1 = RecursiveValves2(otherValvesRemaining, cv1, cv2, nextValve, rt1, rt2, 1)
 			}
+			if rt2 > 0 {
+				npr2 = RecursiveValves2(otherValvesRemaining, cv1, cv2, nextValve, rt1, rt2, 2)
+			}
+			maxPressureReleased = max(maxPressureReleased, npr1, npr2)
 		}
 	}
+	// fmt.Println(pressureReleased, maxPressureReleased, len(remainingValves))
 
 	return pressureReleased + maxPressureReleased
 }
@@ -151,20 +158,20 @@ func main() {
 	currentValve = valves["AA"]
 	minutesLeft = MINUTES_AVAILABLE - 4 // teach elephant
 
-	positiveValves := make(map[*Valve]int, 0)
+	positiveValves := make(map[*Valve]*int, 0)
+	op := 99999999
 	for _, v := range valves {
-		positiveValves[v] = 0
-	}
-	var potentialMaxPressureRelease, npr, count int
-	for k1 := range positiveValves {
-		for k2 := range positiveValves {
-			if k1 != k2 {
-				count++
-				npr = RecursiveValves2(positiveValves, currentValve, currentValve, k1, k2, minutesLeft, minutesLeft)
-				fmt.Println(count, npr)
-				potentialMaxPressureRelease = max(potentialMaxPressureRelease, npr)
-			}
+		if v.FlowRate > 0 {
+			positiveValves[v] = &op
 		}
+	}
+	var potentialMaxPressureRelease, npr1, npr2, count int
+	for k := range positiveValves {
+		count++
+		npr1 = RecursiveValves2(positiveValves, currentValve, currentValve, k, minutesLeft, minutesLeft, 1)
+		npr2 = RecursiveValves2(positiveValves, currentValve, currentValve, k, minutesLeft, minutesLeft, 2)
+		fmt.Println(count, npr1, npr2)
+		potentialMaxPressureRelease = max(potentialMaxPressureRelease, npr1, npr2)
 	}
 
 	fmt.Println("Part 2 Pressure Released: ", potentialMaxPressureRelease)
@@ -177,15 +184,15 @@ func main() {
 	minutesLeft = MINUTES_AVAILABLE
 
 	// positiveValves := make(map[*Valve]int, 0)
-	for _, v := range valves {
-		positiveValves[v] = 0
-	}
+	// for _, v := range valves {
+	// positiveValves[v] = 0
+	// }
 	// var potentialMaxPressureRelease int
-	for k := range positiveValves {
-		potentialMinutesUsed := OPEN_COST + (currentValve.DistanceToValve[k] * TRAVEL_COST)
-		potentialEffectiveRelease := (minutesLeft - potentialMinutesUsed) * k.FlowRate
-		potentialMaxPressureRelease = max(potentialMaxPressureRelease, k.RecursiveValves(positiveValves, minutesLeft-potentialMinutesUsed, potentialEffectiveRelease))
-	}
+	// for k := range positiveValves {
+	// potentialMinutesUsed := OPEN_COST + (currentValve.DistanceToValve[k] * TRAVEL_COST)
+	// potentialEffectiveRelease := (minutesLeft - potentialMinutesUsed) * k.FlowRate
+	// potentialMaxPressureRelease = max(potentialMaxPressureRelease, k.RecursiveValves(positiveValves, minutesLeft-potentialMinutesUsed, potentialEffectiveRelease))
+	// }
 
 	fmt.Println("Part 1 Pressure Released: ", potentialMaxPressureRelease)
 
