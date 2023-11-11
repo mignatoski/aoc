@@ -3,8 +3,14 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
+	"net/http"
+	"sort"
+
 	"os"
 	"strings"
+
+	_ "net/http/pprof"
 )
 
 type Valve struct {
@@ -28,32 +34,30 @@ func CalcPressureAndTimeLeft(c, n *Valve, t int) (int, int) {
 	minutesUsed := OPEN_COST + (c.DistanceToValve[n] * TRAVEL_COST)
 	effectiveMinutes := t - minutesUsed
 	pressureReleased := effectiveMinutes * n.FlowRate
+	if effectiveMinutes < 0 {
+		effectiveMinutes = 0
+	}
+	if pressureReleased < 0 {
+		pressureReleased = 0
+	}
 
+	// fmt.Println(pressureReleased, effectiveMinutes, n.FlowRate, minutesUsed)
 	return pressureReleased, effectiveMinutes
 }
 
-func RecursiveValves2(remainingValves map[*Valve]*int, cv1, cv2, nv *Valve, t1, t2, move int) int {
+func RecursiveValves2(remainingValves []*Valve, cv *Valve, next, t, pr int) int {
 	// copy map to prevent affecting other recursions
-	otherValvesRemaining := make(map[*Valve]*int, 0)
-	var optimisticPressure int
-	for k := range remainingValves {
-		otherValvesRemaining[k] = &optimisticPressure
-		optimisticPressure += max(t1, t2) * k.FlowRate
-	}
-	delete(otherValvesRemaining, nv) // remove self from map
+	otherValvesRemaining := make([]*Valve, len(remainingValves))
+	copy(otherValvesRemaining, remainingValves)
+	nv := otherValvesRemaining[next]
+	otherValvesRemaining[next] = otherValvesRemaining[len(otherValvesRemaining)-1]
+	otherValvesRemaining = otherValvesRemaining[:len(otherValvesRemaining)-1]
 
 	pressureReleased := 0
-	var rt1, rt2 int
+	var rt int
 
-	if move == 1 {
-		pressureReleased, rt1 = CalcPressureAndTimeLeft(cv1, nv, t1)
-		rt2 = t2
-		cv1 = nv
-	} else {
-		pressureReleased, rt2 = CalcPressureAndTimeLeft(cv2, nv, t2)
-		rt1 = t1
-		cv2 = nv
-	}
+	pressureReleased, rt = CalcPressureAndTimeLeft(cv, nv, t)
+
 	if pressureReleased <= 0 {
 		return 0
 	}
@@ -61,16 +65,8 @@ func RecursiveValves2(remainingValves map[*Valve]*int, cv1, cv2, nv *Valve, t1, 
 	var maxPressureReleased, npr1, npr2 int
 
 	for nextValve := range otherValvesRemaining {
-		if optimisticPressure > maxPressureReleased {
-
-			if rt1 > 0 {
-				npr1 = RecursiveValves2(otherValvesRemaining, cv1, cv2, nextValve, rt1, rt2, 1)
-			}
-			if rt2 > 0 {
-				npr2 = RecursiveValves2(otherValvesRemaining, cv1, cv2, nextValve, rt1, rt2, 2)
-			}
-			maxPressureReleased = max(maxPressureReleased, npr1, npr2)
-		}
+		npr1 = RecursiveValves2(otherValvesRemaining, nv, nextValve, rt, pressureReleased)
+		maxPressureReleased = max(maxPressureReleased, npr1, npr2)
 	}
 	// fmt.Println(pressureReleased, maxPressureReleased, len(remainingValves))
 
@@ -97,7 +93,25 @@ func (v *Valve) RecursiveValves(remainingValves map[*Valve]int, remainingTime, p
 	return pressureReleased + maxPressureReleased
 }
 
+var maxRelease map[string]int
+
+func ValvesString(arr []*Valve) string {
+	str := make([]string, len(arr))
+	for i, v := range arr {
+		str[i] = v.Name
+	}
+	sort.Slice(str, func(i, j int) bool {
+		return str[i] < str[j]
+	})
+
+	return strings.Join(str, ",")
+}
+
 func main() {
+
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 	inputFile, _ := os.Open("input.txt")
 	defer inputFile.Close()
 	fileScanner := bufio.NewScanner(inputFile)
@@ -151,49 +165,134 @@ func main() {
 				delete(valvesToVisit, valve)
 			}
 		}
-		fmt.Println(v.Name, v.FlowRate, v.ConnectedValves, len(v.DistanceToValve))
+		// fmt.Println(v.Name, v.FlowRate, v.ConnectedValves, len(v.DistanceToValve))
 	}
 
 	// Part 2 - With partner
 	currentValve = valves["AA"]
 	minutesLeft = MINUTES_AVAILABLE - 4 // teach elephant
 
-	positiveValves := make(map[*Valve]*int, 0)
-	op := 99999999
+	positiveValves := make([]*Valve, 0)
 	for _, v := range valves {
 		if v.FlowRate > 0 {
-			positiveValves[v] = &op
+			positiveValves = append(positiveValves, v)
 		}
 	}
-	var potentialMaxPressureRelease, npr1, npr2, count int
-	for k := range positiveValves {
-		count++
-		npr1 = RecursiveValves2(positiveValves, currentValve, currentValve, k, minutesLeft, minutesLeft, 1)
-		npr2 = RecursiveValves2(positiveValves, currentValve, currentValve, k, minutesLeft, minutesLeft, 2)
-		fmt.Println(count, npr1, npr2)
-		potentialMaxPressureRelease = max(potentialMaxPressureRelease, npr1, npr2)
+
+	sort.Slice(positiveValves, func(i, j int) bool {
+		return positiveValves[i].Name < positiveValves[j].Name
+	})
+
+	// for _, v := range positiveValves {
+	// 	println(v.Name, v.FlowRate)
+	// 	for k, d := range v.DistanceToValve {
+	// 		println("-- ", k.Name, d)
+	// 	}
+	// }
+
+	maxRelease = make(map[string]int)
+	PopulateValveMap(Queue{
+		openedValves:   make([]*Valve, 0),
+		current:        currentValve,
+		timeLeft:       minutesLeft,
+		pressureRelief: 0,
+	}, positiveValves)
+
+	// for k := range positiveValves {
+	// 	npr1 = RecursiveValves2(positiveValves, currentValve, currentValve, k, minutesLeft, minutesLeft)
+	// 	// fmt.Println(count, npr1, npr2)
+	// 	potentialMaxPressureRelease = max(potentialMaxPressureRelease, npr1, npr2)
+	// }
+
+	var maxPr int
+	for _, v := range maxRelease {
+		maxPr = max(maxPr, v)
 	}
+	fmt.Println("Part 1:", maxPr)
 
-	fmt.Println("Part 2 Pressure Released: ", potentialMaxPressureRelease)
+	maxPr = 0
+	for k1, p1 := range maxRelease {
+		for k2, p2 := range maxRelease {
+			found := false
+			a1, a2 := strings.Split(k1, ","), strings.Split(k2, ",")
+			for _, v1 := range a1 {
+				for _, v2 := range a2 {
+					if v1 == v2 {
+						found = true
+						break
+					}
+				}
+			}
+			if !found {
+				maxPr = max(maxPr, p1+p2)
+			}
+		}
+	}
+	fmt.Println("Part 2:", maxPr)
 
-	return
+	// fmt.Println("Part 2 Pressure Released: ", potentialMaxPressureRelease)
 
 	// Graph Traversal - Part 1
 
-	currentValve = valves["AA"]
-	minutesLeft = MINUTES_AVAILABLE
+	// currentValve = valves["AA"]
+	// minutesLeft = MINUTES_AVAILABLE
 
 	// positiveValves := make(map[*Valve]int, 0)
 	// for _, v := range valves {
 	// positiveValves[v] = 0
 	// }
-	// var potentialMaxPressureRelease int
+	// var potentialMaxPressureRelease intjk
 	// for k := range positiveValves {
 	// potentialMinutesUsed := OPEN_COST + (currentValve.DistanceToValve[k] * TRAVEL_COST)
 	// potentialEffectiveRelease := (minutesLeft - potentialMinutesUsed) * k.FlowRate
 	// potentialMaxPressureRelease = max(potentialMaxPressureRelease, k.RecursiveValves(positiveValves, minutesLeft-potentialMinutesUsed, potentialEffectiveRelease))
 	// }
 
-	fmt.Println("Part 1 Pressure Released: ", potentialMaxPressureRelease)
+	// fmt.Println("Part 1 Pressure Released: ", potentialMaxPressureRelease)
+
+}
+
+type Queue struct {
+	openedValves             []*Valve
+	current                  *Valve
+	timeLeft, pressureRelief int
+}
+
+func PopulateValveMap(iq Queue, positiveValves []*Valve) {
+
+	aq := make([]*Queue, 1)
+	aq[0] = &iq
+
+	for len(aq) > 0 {
+		q := aq[0]
+		for _, v := range positiveValves {
+			found := false
+			for _, ov := range q.openedValves {
+				if v.Name == ov.Name {
+					found = true
+				}
+			}
+			if !found && q.current.DistanceToValve[v] <= q.timeLeft {
+				newOpenedValves := make([]*Valve, len(q.openedValves))
+				copy(newOpenedValves, q.openedValves)
+				newOpenedValves = append(newOpenedValves, v)
+				key := ValvesString(newOpenedValves)
+				pr, tl := CalcPressureAndTimeLeft(q.current, v, q.timeLeft)
+				if tl > 0 {
+					nq := &Queue{
+						openedValves:   newOpenedValves,
+						current:        v,
+						timeLeft:       tl,
+						pressureRelief: pr + q.pressureRelief,
+					}
+					aq = append(aq, nq)
+				}
+				// fmt.Println(key, pr+q.pressureRelief, pr, q.pressureRelief)
+				maxRelease[key] = max(maxRelease[key], pr+q.pressureRelief)
+
+			}
+		}
+		aq = aq[1:]
+	}
 
 }
