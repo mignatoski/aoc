@@ -7,8 +7,8 @@ import (
 )
 
 type Blueprint struct {
-	Id                         int
-	Ore, Clay, Obsidian, Geode Cost
+	Id        int
+	RobotCost []Cost
 }
 
 type Cost struct {
@@ -18,6 +18,7 @@ type Cost struct {
 type State struct {
 	Minute            int
 	Robots, Resources []int
+	BP                Blueprint
 }
 
 type Resource int
@@ -42,11 +43,15 @@ func main() {
 
 	var line string
 	for fileScanner.Scan() {
-		b := Blueprint{}
+		b := Blueprint{RobotCost: make([]Cost, 4)}
 		line = fileScanner.Text()
 		fmt.Sscanf(line,
 			"Blueprint %d: Each ore robot costs %d ore. Each clay robot costs %d ore. Each obsidian robot costs %d ore and %d clay. Each geode robot costs %d ore and %d obsidian.",
-			&b.Id, &b.Ore.Ore, &b.Clay.Ore, &b.Obsidian.Ore, &b.Obsidian.Clay, &b.Geode.Ore, &b.Geode.Obsidian)
+			&b.Id,
+			&b.RobotCost[ORE].Ore,
+			&b.RobotCost[CLAY].Ore,
+			&b.RobotCost[OBSIDIAN].Ore, &b.RobotCost[OBSIDIAN].Clay,
+			&b.RobotCost[GEODE].Ore, &b.RobotCost[GEODE].Obsidian)
 		blueprints = append(blueprints, b)
 	}
 	fmt.Println(blueprints)
@@ -60,10 +65,52 @@ func main() {
 }
 
 func (b Blueprint) QualityLevel() int {
-
-	return 0
+	s := State{
+		Minute:    1,
+		Robots:    make([]int, 4),
+		Resources: make([]int, 4),
+		BP:        b,
+	}
+	return b.Id * s.MaxGeodes()
 }
 
-func (s State) MaxGeodes(b Blueprint) {
+func (s State) MaxGeodes() int {
+	if s.Minute == MINUTES {
+		s.Collect()
+		return s.Resources[GEODE]
+	}
 
+	s.Minute++
+	var maxGeode int
+	maxGeode = max(maxGeode, s.Collect().MaxGeodes())
+	for i := 0; i < 4; i++ {
+		if s.CanBuy(Resource(i)) {
+			maxGeode = max(maxGeode, s.Collect().Buy(Resource(i)).MaxGeodes())
+		}
+	}
+
+	return maxGeode
+}
+
+func (s State) CanBuy(r Resource) bool {
+	if s.Resources[ORE] >= s.BP.RobotCost[r].Ore && s.Resources[CLAY] >= s.BP.RobotCost[r].Clay && s.Resources[OBSIDIAN] >= s.BP.RobotCost[r].Obsidian {
+		return true
+	}
+	return false
+}
+
+func (s State) Buy(r Resource) State {
+	s.Robots[r]++
+	s.Resources[ORE] -= s.BP.RobotCost[r].Ore
+	s.Resources[CLAY] -= s.BP.RobotCost[r].Clay
+	s.Resources[OBSIDIAN] -= s.BP.RobotCost[r].Obsidian
+	return s
+
+}
+
+func (s State) Collect() State {
+	for i := 0; i < 4; i++ {
+		s.Resources[i] += s.Robots[i]
+	}
+	return s
 }
