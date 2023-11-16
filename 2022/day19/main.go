@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"sort"
 )
 
 type Blueprint struct {
@@ -12,7 +11,7 @@ type Blueprint struct {
 	RobotCost []Cost
 	MaxGeodes int
 	Stack     []*State
-	Most      Cost
+	Most      []int
 }
 
 type Cost struct {
@@ -57,9 +56,11 @@ func main() {
 			&b.RobotCost[OBSIDIAN].Ore, &b.RobotCost[OBSIDIAN].Clay,
 			&b.RobotCost[GEODE].Ore, &b.RobotCost[GEODE].Obsidian)
 		cost := b.RobotCost
-		b.Most.Ore = max(cost[ORE].Ore, cost[CLAY].Ore, cost[OBSIDIAN].Ore, cost[GEODE].Ore)
-		b.Most.Clay = cost[OBSIDIAN].Clay
-		b.Most.Obsidian = cost[GEODE].Obsidian
+		b.Most = make([]int, 4)
+		b.Most[ORE] = max(cost[ORE].Ore, cost[CLAY].Ore, cost[OBSIDIAN].Ore, cost[GEODE].Ore)
+		b.Most[CLAY] = cost[OBSIDIAN].Clay
+		b.Most[OBSIDIAN] = cost[GEODE].Obsidian
+		b.Most[GEODE] = 100_000
 		blueprints = append(blueprints, b)
 	}
 	fmt.Println(blueprints)
@@ -83,44 +84,36 @@ func (b Blueprint) QualityLevel() int {
 	b.Stack = make([]*State, 1)
 	b.Stack[0] = &s
 
-	var cur *State
+	b.UpdateMaxGeodes()
 
-	for len(b.Stack) > 0 {
-		sort.Slice(b.Stack, func(i, j int) bool {
-			return b.Stack[i].Minute > b.Stack[j].Minute
-			// return b.Stack[i].PotentialGeodes() > b.Stack[j].PotentialGeodes()
-		})
-		cur = b.Stack[0]
-		cur.MaxGeodes()
-
-		b.Stack = b.Stack[1:]
-	}
 	fmt.Println(b.Id, b.MaxGeodes)
 	return b.Id * b.MaxGeodes
 }
 
-func (s State) MaxGeodes() {
-	ns := s.Copy()
-	if ns.Minute == MINUTES {
-		fmt.Println("END: ", ns)
-		ns.Collect()
-		ns.BP.MaxGeodes = max(ns.BP.MaxGeodes, ns.Resources[GEODE])
+func (b *Blueprint) UpdateMaxGeodes() {
+	s := b.Stack[0].Copy()
+	b.Stack = b.Stack[1:]
+
+	if s.Minute == MINUTES {
+		s.Collect()
+		s.BP.MaxGeodes = max(s.BP.MaxGeodes, s.Resources[GEODE])
 	}
 
 	if s.PotentialGeodes() > s.BP.MaxGeodes {
-		ns.Minute++
-		ns.Collect()
-		s.BP.Stack = append(s.BP.Stack, &ns)
-		fmt.Println("Nothing: ", ns)
 		for i := 3; i >= 0; i-- {
 			ns2 := s.Copy()
-			ns2.Minute++
 			if ns2.CanBuy(Resource(i)) {
-				fmt.Println("BUY: ", ns)
 				ns2.Collect().Buy(Resource(i))
-				s.BP.Stack = append(s.BP.Stack, &ns2)
+				ns2.Minute++
+				b.Stack = append(b.Stack, &ns2)
+				b.UpdateMaxGeodes()
 			}
 		}
+		ns := s.Copy()
+		ns.Collect()
+		ns.Minute++
+		b.Stack = append(b.Stack, &ns)
+		b.UpdateMaxGeodes()
 	}
 }
 func (s *State) TimeLeft() int {
@@ -140,19 +133,9 @@ func (s *State) PotentialGeodes() int {
 func (s *State) CanBuy(r Resource) bool {
 	cost := s.BP.RobotCost[r]
 
-	/* maxOre := s.TimeLeft() * (s.BP.RobotCost[CLAY].Ore +
-		s.BP.RobotCost[OBSIDIAN].Ore +
-		s.BP.RobotCost[GEODE].Ore)
-
-	maxClay := s.TimeLeft() * (s.BP.RobotCost[OBSIDIAN].Clay +
-		s.BP.RobotCost[GEODE].Clay)
-
-	maxObsidian := s.TimeLeft() * (s.BP.RobotCost[GEODE].Obsidian) */
-
 	if true &&
-		s.Robots[ORE] < s.BP.Most.Ore &&
-		s.Robots[CLAY] < s.BP.Most.Clay &&
-		s.Robots[OBSIDIAN] < s.BP.Most.Obsidian &&
+		s.Robots[r] < s.BP.Most[r] &&
+		s.BP.Most[r]*s.TimeLeft() > s.Resources[r] &&
 		s.Resources[ORE] >= cost.Ore &&
 		s.Resources[CLAY] >= cost.Clay &&
 		s.Resources[OBSIDIAN] >= cost.Obsidian {
