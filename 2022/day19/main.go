@@ -21,6 +21,7 @@ type Cost struct {
 type State struct {
 	Minute            int
 	Robots, Resources []int
+	Goal              Resource
 	BP                *Blueprint
 }
 
@@ -33,14 +34,14 @@ const (
 	GEODE
 )
 
-const (
+var (
 	MINUTES = 24
 )
 
 var blueprints []Blueprint
 
 func main() {
-	inputFile, _ := os.Open("sample.txt")
+	inputFile, _ := os.Open("input.txt")
 	defer inputFile.Close()
 	fileScanner := bufio.NewScanner(inputFile)
 
@@ -71,6 +72,15 @@ func main() {
 	}
 
 	fmt.Println("Part 1:", totalQualityLevel)
+
+	MINUTES = 32
+	score := 1
+	for i := 0; i < min(len(blueprints), 3); i++ {
+		b := blueprints[i]
+		b.MaxGeodes = 0
+		score *= b.QualityLevel() / b.Id
+	}
+	fmt.Println("Part 2:", score)
 }
 
 func (b Blueprint) QualityLevel() int {
@@ -81,39 +91,48 @@ func (b Blueprint) QualityLevel() int {
 		BP:        &b,
 	}
 	s.Robots[ORE] = 1
-	b.Stack = make([]*State, 1)
-	b.Stack[0] = &s
+	b.Stack = make([]*State, 0)
 
-	b.UpdateMaxGeodes()
+	for i := 0; i < 2; i++ {
+		ns := s.Copy()
+		ns.Goal = Resource(i)
+		b.Stack = append(b.Stack, &ns)
+		b.UpdateMaxGeodes(ns)
+	}
 
 	fmt.Println(b.Id, b.MaxGeodes)
 	return b.Id * b.MaxGeodes
 }
 
-func (b *Blueprint) UpdateMaxGeodes() {
-	s := b.Stack[0].Copy()
-	b.Stack = b.Stack[1:]
+func (b *Blueprint) UpdateMaxGeodes(is State) {
+	s := is.Copy()
+	// b.Stack = b.Stack[1:]
 
+	// fmt.Println(s, b.MaxGeodes)
 	if s.Minute == MINUTES {
 		s.Collect()
-		s.BP.MaxGeodes = max(s.BP.MaxGeodes, s.Resources[GEODE])
+		b.MaxGeodes = max(b.MaxGeodes, s.Resources[GEODE])
+		return
 	}
 
-	if s.PotentialGeodes() > s.BP.MaxGeodes {
-		for i := 3; i >= 0; i-- {
-			ns2 := s.Copy()
-			if ns2.CanBuy(Resource(i)) {
-				ns2.Collect().Buy(Resource(i))
-				ns2.Minute++
-				b.Stack = append(b.Stack, &ns2)
-				b.UpdateMaxGeodes()
+	if s.PotentialGeodes() > b.MaxGeodes {
+		if s.CanBuy(Resource(s.Goal)) {
+			s.Collect().Buy(Resource(s.Goal))
+			s.Minute++
+			for i := 0; i < 4; i++ {
+				ns := s.Copy()
+				ns.Goal = Resource(i)
+				// b.Stack = append(b.Stack, &ns)
+				// fmt.Println(s, b.MaxGeodes)
+				b.UpdateMaxGeodes(ns)
 			}
+		} else {
+			ns := is.Copy()
+			ns.Collect()
+			ns.Minute++
+			// b.Stack = append(b.Stack, &ns)
+			b.UpdateMaxGeodes(ns)
 		}
-		ns := s.Copy()
-		ns.Collect()
-		ns.Minute++
-		b.Stack = append(b.Stack, &ns)
-		b.UpdateMaxGeodes()
 	}
 }
 func (s *State) TimeLeft() int {
@@ -123,8 +142,8 @@ func (s *State) TimeLeft() int {
 func (s *State) PotentialGeodes() int {
 	geodeRate := s.Robots[GEODE]
 	potentialGeodes := s.Resources[GEODE]
-	for i := 0; i < s.TimeLeft(); i++ {
-		potentialGeodes = geodeRate
+	for i := 0; i <= s.TimeLeft(); i++ {
+		potentialGeodes += geodeRate
 		geodeRate++
 	}
 	return potentialGeodes
@@ -135,7 +154,7 @@ func (s *State) CanBuy(r Resource) bool {
 
 	if true &&
 		s.Robots[r] < s.BP.Most[r] &&
-		s.BP.Most[r]*s.TimeLeft() > s.Resources[r] &&
+		// s.BP.Most[r]*s.TimeLeft() > s.Resources[r] &&
 		s.Resources[ORE] >= cost.Ore &&
 		s.Resources[CLAY] >= cost.Clay &&
 		s.Resources[OBSIDIAN] >= cost.Obsidian {
@@ -166,6 +185,7 @@ func (s *State) Copy() State {
 		Resources: make([]int, 4),
 	}
 	ns.Minute = s.Minute
+	ns.Goal = s.Goal
 	copy(ns.Robots, s.Robots)
 	copy(ns.Resources, s.Resources)
 	ns.BP = s.BP
