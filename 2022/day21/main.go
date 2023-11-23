@@ -68,33 +68,195 @@ func (m *Monkey) GetHuman() Human {
 
 	switch m.Op {
 	case '+':
-		return Human{h1.CoefN + h2.CoefN, (h1.ConstN * h2.ConstD) + (h2.ConstN * h1.ConstD), h1.CoefD * h2.CoefD, h1.ConstD * h2.ConstD}
+		return Add(h1, h2)
 	case '-':
-		return Human{h1.CoefN - h2.CoefN, (h1.ConstN * h2.ConstD) - (h2.ConstN * h1.ConstD), h1.CoefD * h2.CoefD, h1.ConstD * h2.ConstD}
+		return Sub(h1, h2)
 	case '*':
-		if h2.CoefN == 0 {
-			h2.CoefN = h2.ConstN
-		} else if h1.CoefN == 0 {
-			h1.CoefN = h1.ConstN
-		}
-		return Human{h1.CoefN * h2.CoefN, h1.ConstN * h2.ConstN, h1.CoefD * h2.CoefD, h1.ConstD * h2.ConstD}
+		return Mult(h1, h2)
 	case '/':
-		if h2.CoefN == 0 {
-			h2.CoefN = h2.ConstN
-		} else if h1.CoefN == 0 {
-			h1.CoefN = h1.ConstN
-		}
-		return Human{h1.CoefN * h2.CoefD, h1.ConstN * h2.ConstD, h1.CoefD * h2.CoefN, h1.ConstD * h2.ConstN}
+		return Div(h1, h2)
 	}
 	panic("uh oh")
 }
+
+// greatest common divisor (GCD) via Euclidean algorithm
+func GCD(a, b int) int {
+	for b != 0 {
+		t := b
+		b = a % b
+		a = t
+	}
+	return a
+}
+
+// find Least Common Multiple (LCM) via GCD
+func LCM(a, b int) (lcm int, ax int, bx int) {
+	result := a * b / GCD(a, b)
+
+	return result, result / a, result / b
+}
+
+func Div(h1, h2 Human) Human {
+	var result Human
+
+	if h1.CoefN == 0 && h2.CoefN == 0 {
+		result.CoefN = 0
+		result.CoefD = 1
+	} else if h1.CoefN == 0 {
+		result.CoefN = h2.CoefN * h1.ConstD
+		result.CoefD = h2.CoefD * h1.ConstN
+	} else if h2.CoefN == 0 {
+		result.CoefN = h1.CoefN * h2.ConstD
+		result.CoefD = h1.CoefD * h2.ConstN
+	} else {
+		panic("too many humans")
+	}
+
+	if h1.ConstN == 0 && h2.ConstN == 0 {
+		result.ConstN = 0
+		result.ConstD = 1
+	} else if h1.ConstN == 0 {
+		result.ConstN = h2.ConstN
+		result.ConstD = h2.ConstD
+	} else if h2.ConstN == 0 {
+		result.ConstN = h1.ConstN
+		result.ConstD = h1.ConstD
+	} else {
+		result.ConstN = h1.ConstN * h2.ConstD
+		result.ConstD = h1.ConstD * h2.ConstN
+	}
+
+	gcd := GCD(result.CoefN, result.CoefD)
+	result.CoefN /= gcd
+	result.CoefD /= gcd
+	gcd = GCD(result.ConstN, result.ConstD)
+	result.ConstN /= gcd
+	result.ConstD /= gcd
+
+	return result
+}
+
+func Mult(h1, h2 Human) Human {
+	var result Human
+
+	if h1.CoefN == 0 && h2.CoefN == 0 {
+		result.CoefN = 0
+		result.CoefD = 1
+	} else if h1.CoefN == 0 {
+		result.CoefN = h2.CoefN * h1.ConstN
+		result.CoefD = h2.CoefD * h1.ConstD
+	} else if h2.CoefN == 0 {
+		result.CoefN = h1.CoefN * h2.ConstN
+		result.CoefD = h1.CoefD * h2.ConstD
+	} else {
+		panic("too many humans")
+	}
+
+	if h1.ConstN == 0 && h2.ConstN == 0 {
+		result.ConstN = 0
+		result.ConstD = 1
+	} else if h1.ConstN == 0 {
+		result.ConstN = h2.ConstN
+		result.ConstD = h2.ConstD
+	} else if h2.ConstN == 0 {
+		result.ConstN = h1.ConstN
+		result.ConstD = h1.ConstD
+	} else {
+		result.ConstN = h1.ConstN * h2.ConstN
+		result.ConstD = h1.ConstD * h2.ConstD
+	}
+
+	gcd := GCD(result.CoefN, result.CoefD)
+	result.CoefN /= gcd
+	result.CoefD /= gcd
+	gcd = GCD(result.ConstN, result.ConstD)
+	result.ConstN /= gcd
+	result.ConstD /= gcd
+
+	return result
+}
+
+func Sub(h1, h2 Human) Human {
+	var result Human
+
+	result.CoefN = h1.CoefN - h2.CoefN
+	result.CoefD = h1.CoefD * h2.CoefD
+	if h1.ConstN == 0 && h2.ConstN == 0 {
+		result.ConstN = 0
+		result.ConstD = 1
+	} else if h1.ConstN == 0 {
+		result.ConstN = 0 - h2.ConstN
+		result.ConstD = h2.ConstD
+	} else if h2.ConstN == 0 {
+		result.ConstN = h1.ConstN
+		result.ConstD = h1.ConstD
+	} else {
+		lcm, ax, bx := LCM(h1.ConstD, h2.ConstD)
+		result.ConstN = (h1.ConstN * ax) - (h2.ConstN * bx)
+		result.ConstD = lcm
+	}
+
+	gcd := GCD(result.CoefN, result.CoefD)
+	result.CoefN /= gcd
+	result.CoefD /= gcd
+	gcd = GCD(result.ConstN, result.ConstD)
+	result.ConstN /= gcd
+	result.ConstD /= gcd
+
+	return result
+}
+
+func Add(h1, h2 Human) Human {
+	var result Human
+
+	result.CoefN = h1.CoefN + h2.CoefN
+	result.CoefD = h1.CoefD * h2.CoefD
+	if h1.ConstN == 0 && h2.ConstN == 0 {
+		result.ConstN = 0
+		result.ConstD = 1
+	} else if h1.ConstN == 0 {
+		result.ConstN = h2.ConstN
+		result.ConstD = h2.ConstD
+	} else if h2.ConstN == 0 {
+		result.ConstN = h1.ConstN
+		result.ConstD = h1.ConstD
+	} else {
+		lcm, ax, bx := LCM(h1.ConstD, h2.ConstD)
+		result.ConstN = (h1.ConstN * ax) + (h2.ConstN * bx)
+		result.ConstD = lcm
+	}
+
+	gcd := GCD(result.CoefN, result.CoefD)
+	result.CoefN /= gcd
+	result.CoefD /= gcd
+	gcd = GCD(result.ConstN, result.ConstD)
+	result.ConstN /= gcd
+	result.ConstD /= gcd
+
+	return result
+}
+
+func Solve(h1, h2 Human) int {
+	var result int
+	if h1.CoefN == 0 {
+		t := h1
+		h1 = h2
+		h2 = t
+	}
+	rN := ((h2.ConstN * h1.CoefD * h1.ConstD) - (h1.ConstN * h1.CoefD)) * (h1.CoefD * h1.ConstD)
+	rD := (h2.ConstD * h1.CoefD * h1.ConstD) * h1.CoefN * h1.ConstD
+	result = rN / rD
+
+	return result
+}
+
 func init() {
 	monkeys = make([]Monkey, 0)
 	monkeys2 = make([]Monkey, 0)
 }
 
 func main() {
-	inputFile, _ := os.Open("sample.txt")
+	inputFile, _ := os.Open("input.txt")
 	defer inputFile.Close()
 	fileScanner := bufio.NewScanner(inputFile)
 
@@ -128,7 +290,7 @@ func main() {
 	m1, m2 := FindMonkey(root2.M1, monkeys2), FindMonkey(root.M2, monkeys2)
 	h1, h2 := m1.GetHuman(), m2.GetHuman()
 
-	fmt.Println(h1, h2, m2)
-	fmt.Println("Part 2: ", ((h2.ConstN*h1.ConstD)-(h1.ConstN*h2.ConstD))/(h1.ConstD*h2.ConstD))
+	fmt.Println(h1, h2)
+	fmt.Println("Part 2: ", Solve(h1, h2))
 
 }
