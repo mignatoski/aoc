@@ -17,6 +17,7 @@ func (l List) String() string {
 	var sb strings.Builder
 	var bz strings.Builder
 	found := false
+	C := len(l) - 1
 
 	for _, n := range l {
 		if n.Val == 0 {
@@ -24,9 +25,9 @@ func (l List) String() string {
 		}
 
 		if found {
-			sb.WriteString(fmt.Sprint(n.Val, ", "))
+			sb.WriteString(fmt.Sprint(n.Val%C, ", "))
 		} else {
-			bz.WriteString(fmt.Sprint(n.Val, ", "))
+			bz.WriteString(fmt.Sprint(n.Val%C, ", "))
 		}
 
 	}
@@ -37,7 +38,7 @@ func (l List) String() string {
 const KEY = 811589153
 
 func main() {
-	inputFile, _ := os.Open("sample.txt")
+	inputFile, _ := os.Open("input.txt")
 	defer inputFile.Close()
 	fileScanner := bufio.NewScanner(inputFile)
 
@@ -71,11 +72,11 @@ func main() {
 }
 
 func Mix(list List) {
-	fmt.Println("Start", list)
+	// fmt.Println("Start", list)
 	for i := 0; i < len(list); i++ {
 		p := Find(i, list)
 		Move(p, list)
-		fmt.Println(list)
+		// fmt.Println(list)
 	}
 }
 
@@ -95,14 +96,16 @@ func Move(p int, list List) {
 	m := n.Val % C
 
 	fp := (p + m) % L
-	if fp <= 0 && m < 0 {
+	if m < 0 {
 		fp += C
+		fp = fp % L
 	}
 	limit := fp
 	if fp < p {
 		limit += L
 	}
-	// fmt.Println(n, p, fp, L, limit)
+
+	// fmt.Printf("Moving %d from %d to pos %d between %d and %d\n", m, p, fp, list[(fp)%L].Val, list[(fp+1)%L].Val)
 
 	for i := p; i < limit; i++ {
 		list[i%L] = list[(i+1)%L]
