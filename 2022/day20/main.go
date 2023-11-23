@@ -4,10 +4,34 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strings"
 )
 
 type Number struct {
 	Val, InitialPosition int
+}
+
+type List []Number
+
+func (l List) String() string {
+	var sb strings.Builder
+	var bz strings.Builder
+	found := false
+
+	for _, n := range l {
+		if n.Val == 0 {
+			found = true
+		}
+
+		if found {
+			sb.WriteString(fmt.Sprint(n.Val, ", "))
+		} else {
+			bz.WriteString(fmt.Sprint(n.Val, ", "))
+		}
+
+	}
+
+	return sb.String() + bz.String()
 }
 
 const KEY = 811589153
@@ -19,7 +43,7 @@ func main() {
 
 	var line string
 	i := 0
-	list := make([]Number, 0)
+	list := make(List, 0)
 	for fileScanner.Scan() {
 		line = fileScanner.Text()
 		n := Number{InitialPosition: i}
@@ -27,7 +51,7 @@ func main() {
 		list = append(list, n)
 		i++
 	}
-	list2 := make([]Number, len(list))
+	list2 := make(List, len(list))
 	copy(list2, list)
 
 	Mix(list)
@@ -39,22 +63,23 @@ func main() {
 
 	for i := 0; i < 10; i++ {
 		Mix(list2)
-		fmt.Println("Mix #", i)
+		fmt.Println("Mix #", i, "List: ", list2)
 	}
 
 	fmt.Println("Part 2:", Answer(list2))
 
 }
 
-func Mix(list []Number) {
+func Mix(list List) {
+	fmt.Println("Start", list)
 	for i := 0; i < len(list); i++ {
-		// fmt.Println(list)
 		p := Find(i, list)
 		Move(p, list)
+		fmt.Println(list)
 	}
 }
 
-func Find(ip int, list []Number) int {
+func Find(ip int, list List) int {
 	for i, n := range list {
 		if n.InitialPosition == ip {
 			return i
@@ -63,20 +88,15 @@ func Find(ip int, list []Number) int {
 	panic("uh oh")
 }
 
-func Move(p int, list []Number) {
+func Move(p int, list List) {
 	L := len(list)
+	C := L - 1
 	n := list[p]
+	m := n.Val % C
 
-	m := n.Val % (L)
-	adj := n.Val / L
-	fp := ((p + m) % L) + adj
-	for fp >= L {
-		m = (m + adj) % L
-		adj = (m + adj) / L
-		fp = ((p + m) % L) + adj
-	}
-	for fp < 0 {
-		fp += L - 1
+	fp := (p + m) % L
+	if fp <= 0 && m < 0 {
+		fp += C
 	}
 	limit := fp
 	if fp < p {
@@ -91,7 +111,7 @@ func Move(p int, list []Number) {
 	list[fp] = n
 }
 
-func Answer(list []Number) int {
+func Answer(list List) int {
 	for i, n := range list {
 		if n.Val == 0 {
 			L := len(list)
