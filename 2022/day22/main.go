@@ -18,10 +18,10 @@ var grid Grid
 var size, start, pos Point
 
 var (
-	UP    Point = Point{0, 1}
+	UP    Point = Point{0, -1}
 	RIGHT Point = Point{1, 0}
 	LEFT  Point = Point{-1, 0}
-	DOWN  Point = Point{0, -1}
+	DOWN  Point = Point{0, 1}
 )
 
 type Direction struct {
@@ -51,7 +51,7 @@ func init() {
 }
 
 func main() {
-	inputFile, _ := os.Open("sample.txt")
+	inputFile, _ := os.Open("input.txt")
 	defer inputFile.Close()
 	fileScanner := bufio.NewScanner(inputFile)
 
@@ -119,7 +119,7 @@ func main() {
 }
 
 func Password() int {
-	return (1000 * pos.Y) + (4 * pos.X) + (dir.Value)
+	return (1000 * (pos.Y + 1)) + (4 * (pos.X + 1)) + (dir.Value)
 }
 
 func Move(steps int) {
@@ -139,21 +139,23 @@ func Check() (next Point, valid bool) {
 	for {
 		fmt.Println(pos, next, grid[next], dir.D)
 		switch grid[next] {
-		case ' ':
-			next.X = pos.X + dir.D.X
-			next.Y = pos.Y + dir.D.Y
 		case 0:
-			switch dir.D {
-			case RIGHT:
-				next.X = 0
-			case DOWN:
-				next.Y = 0
-			case LEFT:
-				next.X = size.X
-			case UP:
-				next.Y = size.Y
-			default:
-				panic("awwp")
+			next.X += dir.D.X
+			next.Y += dir.D.Y
+			if next.X < 0 || next.Y < 0 ||
+				next.X >= size.X || next.Y >= size.Y {
+				switch dir.D {
+				case RIGHT:
+					next.X = 0
+				case DOWN:
+					next.Y = 0
+				case LEFT:
+					next.X = size.X - 1
+				case UP:
+					next.Y = size.Y - 1
+				default:
+					panic("awwp")
+				}
 			}
 		case '.':
 			valid = true
