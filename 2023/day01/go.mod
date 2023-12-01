@@ -1,3 +1,3 @@
-module github.com/mignatoski/aoc/2022/day
+module github.com/mignatoski/aoc/2023/day01
 
 go 1.21
