@@ -8,22 +8,25 @@ import (
 	"strings"
 )
 
+type SeedRange struct {
+	Start, Length int
+}
 type ValMap struct {
 	DestStart, SourceStart, RangeLength int
 }
-type Almanac []*[]*ValMap
+type ConversionTable []ValMap
+type Almanac []ConversionTable
 
 func main() {
-	inputFile, _ := os.Open("input.txt")
+	inputFile, _ := os.Open("sample.txt")
 	defer inputFile.Close()
 	fileScanner := bufio.NewScanner(inputFile)
 
 	var line string
 	lines := 0
 	seeds := make([]int, 0)
+	seedRanges := make([]SeedRange, 0)
 	almanac := make(Almanac, 0)
-	var maps *[]*ValMap
-	var curValMap *ValMap
 	minVal := 9999999999999
 	for fileScanner.Scan() {
 		lines++
@@ -35,6 +38,12 @@ func main() {
 				intSeed, _ := strconv.ParseInt(strSeeds[i], 0, 0)
 				seeds = append(seeds, int(intSeed))
 			}
+			for i := 1; i < len(strSeeds); i++ {
+				intStart, _ := strconv.ParseInt(strSeeds[i], 0, 0)
+				i++
+				intLength, _ := strconv.ParseInt(strSeeds[i], 0, 0)
+				seedRanges = append(seedRanges, SeedRange{int(intStart), int(intLength)})
+			}
 			continue
 		}
 
@@ -43,13 +52,12 @@ func main() {
 		}
 
 		if strings.Contains(line, ":") {
-			m := make([]*ValMap, 0)
-			maps = &m
-			almanac = append(almanac, maps)
+			m := make(ConversionTable, 0)
+			almanac = append(almanac, m)
 		} else {
-			curValMap = &ValMap{}
-			*maps = append(*maps, curValMap)
-			fmt.Sscanf(line, "%d %d %d", &curValMap.DestStart, &curValMap.SourceStart, &curValMap.RangeLength)
+			vm := ValMap{}
+			fmt.Sscanf(line, "%d %d %d", &vm.DestStart, &vm.SourceStart, &vm.RangeLength)
+			almanac[len(almanac)-1] = append(almanac[len(almanac)-1], vm)
 		}
 	}
 
@@ -57,7 +65,7 @@ func main() {
 		val := s
 		fmt.Printf("s: %v\n", s)
 		for _, arr := range almanac {
-			for _, m := range *arr {
+			for _, m := range arr {
 				if val >= m.SourceStart && val < m.SourceStart+m.RangeLength {
 					val += m.DestStart - m.SourceStart
 					break
@@ -70,5 +78,29 @@ func main() {
 
 	fmt.Println("Part 1: ", minVal)
 
+	fmt.Println(seedRanges)
+	fmt.Println(almanac)
+
+	for i, x := range almanac {
+		fmt.Println("Level:", i)
+		for _, y := range x {
+			fmt.Println(y)
+		}
+	}
+	// for _, s := range seedRanges {
+	// 	val := s
+	// 	fmt.Printf("s: %v\n", s)
+	// 	for _, arr := range almanac {
+	// 		for _, m := range *arr {
+	// 			if val >= m.SourceStart && val < m.SourceStart+m.RangeLength {
+	// 				val += m.DestStart - m.SourceStart
+	// 				break
+	// 			}
+	// 		}
+	// 	}
+	// 	fmt.Printf("val: %v\n", val)
+	// 	minVal = min(minVal, val)
+	// }
+	//
 	fmt.Println("Part 2: ", line)
 }
