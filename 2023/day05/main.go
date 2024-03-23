@@ -5,205 +5,90 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"sort"
-	"strconv"
 	"strings"
 )
 
-type SeedRange struct {
-	Start, Length int
-}
-type ValMap struct {
-	DestStart, SourceStart, RangeLength, MinOutput int
-}
-type ConversionTable []ValMap
-type Almanac []ConversionTable
-
-type ByMinOutput ConversionTable
-
-func (a ByMinOutput) Len() int           { return len(a) }
-func (a ByMinOutput) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByMinOutput) Less(i, j int) bool { return a[i].MinOutput < a[j].MinOutput }
-
-type ByDestStart ConversionTable
-
-func (a ByDestStart) Len() int           { return len(a) }
-func (a ByDestStart) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByDestStart) Less(i, j int) bool { return a[i].DestStart < a[j].DestStart }
-
-type Graph struct {
-	Nodes []*Node
-}
-
-type Node struct {
-	IsRoot, IsLeaf     bool
-	R                  Range
-	Offset             int
-	ToNodes, FromNodes []*Node
-}
-
 type Range struct {
-	Start, End int
+	Start, Offset, Len int
 }
+type RangeSet []Range
+type Layers []RangeSet
 
-// Util
-
-func Overlap(r1, r2 Range) bool {
-	switch {
-	case r1.Start >= r2.Start && r1.Start <= r2.End:
-		return true
-	case r1.End >= r2.Start && r1.End <= r2.End:
-		return true
-	default:
-		return false
-	}
-}
-
-func (n *Node) LinkTo(to *Node) {
-	n.ToNodes = append(n.ToNodes, to)
-	to.FromNodes = append(to.FromNodes, n)
-}
-
-func (g *Graph) DFSFindMin(r Range) (result int) {
-	result = math.MaxInt
-	for _, n := range g.Nodes {
-		if n.IsRoot {
-			result = min(result, n.FindMin(r))
-		}
-	}
-	return result
-}
-
-func (n *Node) FindMin(r Range) (result int) {
-	for _, t := range n.ToNodes {
-		if Overlap(r, t.R) {
-			if t.IsLeaf {
-				result = max(r.Start, t.R.Start) + t.Offset
-			} else {
-				result = t.FindMin(Range{max(r.Start, t.R.Start), min(r.End, t.R.End)})
-			}
-		}
-	}
-	return result
-}
-
-// End Util
+var (
+	seeds  RangeSet
+	layers Layers
+)
 
 func main() {
-	inputFile, _ := os.Open("sample.txt")
-	defer inputFile.Close()
-	fileScanner := bufio.NewScanner(inputFile)
+	f, _ := os.Open("sample.txt")
+	s := bufio.NewScanner(f)
 
-	var line string
-	lines := 0
-	seeds := make([]int, 0)
-	seedRanges := make([]SeedRange, 0)
-	almanac := make(Almanac, 0)
-	minVal := 9999999999999
-	for fileScanner.Scan() {
-		lines++
-		line = fileScanner.Text()
+	seeds = make(RangeSet, 0)
+	layers = make(Layers, 0)
+	li := -1
 
-		if lines == 1 {
-			strSeeds := strings.Split(line, " ")
-			for i := 1; i < len(strSeeds); i++ {
-				intSeed, _ := strconv.ParseInt(strSeeds[i], 0, 0)
-				seeds = append(seeds, int(intSeed))
+	for s.Scan() {
+		l := s.Text()
+
+		switch {
+		case l == "":
+		case strings.Contains(l, "seeds:"):
+			nums := strings.Split(l, " ")
+			nums = nums[1:]
+			for i := 0; i < len(nums); i = i + 2 {
+				var start, length int
+				fmt.Sscanf(nums[i], "%d", &start)
+				fmt.Sscanf(nums[i+1], "%d", &length)
+				seeds = append(seeds, Range{start, 0, length})
 			}
-			for i := 1; i < len(strSeeds); i++ {
-				intStart, _ := strconv.ParseInt(strSeeds[i], 0, 0)
-				i++
-				intLength, _ := strconv.ParseInt(strSeeds[i], 0, 0)
-				seedRanges = append(seedRanges, SeedRange{int(intStart), int(intLength)})
-			}
-			continue
-		}
-
-		if line == "" {
-			continue
-		}
-
-		if strings.Contains(line, ":") {
-			m := make(ConversionTable, 0)
-			almanac = append(almanac, m)
-		} else {
-			vm := ValMap{}
-			fmt.Sscanf(line, "%d %d %d", &vm.DestStart, &vm.SourceStart, &vm.RangeLength)
-			i := len(almanac) - 1
-			almanac[i] = append(almanac[i], vm)
+		case strings.Contains(l, "map:"):
+			li++
+			rs := make(RangeSet, 0)
+			layers = append(layers, rs)
+		default:
+			nums := strings.Split(l, " ")
+			var dest, src, length int
+			fmt.Sscanf(nums[0], "%d", &dest)
+			fmt.Sscanf(nums[1], "%d", &src)
+			fmt.Sscanf(nums[2], "%d", &length)
+			layers[li] = append(layers[li], Range{src, dest - src, length})
 		}
 	}
 
-	for _, s := range seeds {
-		val := s
-		fmt.Printf("s: %v\n", s)
-		for _, arr := range almanac {
-			for _, m := range arr {
-				if val >= m.SourceStart && val < m.SourceStart+m.RangeLength {
-					val += m.DestStart - m.SourceStart
-					break
-				}
-			}
-		}
-		fmt.Printf("val: %v\n", val)
-		minVal = min(minVal, val)
+	fmt.Println(seeds[0], seeds[1])
+	fmt.Println(layers[0][0], layers[1][0])
+
+	for _, r := range seeds {
+		sl := make(Layers, 0)
+		rs := make(RangeSet, 0)
+		rs = append(rs, r)
+		sl = append(sl, rs)
+		minval := expand(&sl, 0)
+		fmt.Println(minval)
 	}
 
-	fmt.Println("Part 1: ", minVal)
+}
 
-	fmt.Println(seedRanges)
-	fmt.Println(almanac)
-
-	for i := len(almanac); i > 0; i-- {
-		a := &almanac[i-1]
-		if i == len(almanac) {
-			sort.Sort(ByDestStart(*a))
-		} else {
-			sort.Sort(ByMinOutput(*a))
+func expand(sl *Layers, layer int) int {
+	rs := layers[layer]
+	if layer == len(layers)-1 {
+		result := math.MaxInt
+		for _, r := range rs {
+			result = min(result, r.Start)
 		}
-		for j := range *a {
-			if i == len(almanac) {
-				(*a)[j].MinOutput = (*a)[j].DestStart
-			} else {
-				pmin := math.MaxInt
-				um := math.MaxInt
-				for _, c := range almanac[i] {
-					if (*a)[j].DestStart+(*a)[j].RangeLength > c.SourceStart &&
-						c.SourceStart+c.RangeLength > (*a)[j].DestStart {
-						pmin = min(pmin, c.MinOutput)
-					} else {
-						if um < c.SourceStart {
-							um = c.SourceStart - 1
-						}
-
-					}
-				}
-				(*a)[j].MinOutput = min(pmin, um)
-			}
+		return result
+	}
+	for i := 0; i < len(rs); i++ {
+		// remove current range
+		for _, l := range layers {
+			// if overlap
+			// then add overlap to next layer
+			//      add remaining 0, 1, or 2 ranges to current layer
+			//      break
+			// else add current range to next layer
+			fmt.Println(l)
 		}
 	}
 
-	for i, x := range almanac {
-		fmt.Println("Level:", i)
-		for _, y := range x {
-			fmt.Println(y)
-		}
-	}
-
-	// for _, s := range seedRanges {
-	// 	val := s
-	// 	fmt.Printf("s: %v\n", s)
-	// 	for _, arr := range almanac {
-	// 		for _, m := range *arr {
-	// 			if val >= m.SourceStart && val < m.SourceStart+m.RangeLength {
-	// 				val += m.DestStart - m.SourceStart
-	// 				break
-	// 			}
-	// 		}
-	// 	}
-	// 	fmt.Printf("val: %v\n", val)
-	// 	minVal = min(minVal, val)
-	// }
-	//
-	fmt.Println("Part 2: ", line)
+	return expand(sl, layer+1)
 }
