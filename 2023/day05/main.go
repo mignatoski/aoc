@@ -20,7 +20,7 @@ var (
 )
 
 func main() {
-	f, _ := os.Open("sample.txt")
+	f, _ := os.Open("input.txt")
 	s := bufio.NewScanner(f)
 
 	seeds = make(RangeSet, 0)
@@ -55,40 +55,80 @@ func main() {
 		}
 	}
 
-	fmt.Println(seeds[0], seeds[1])
-	fmt.Println(layers[0][0], layers[1][0])
-
+	rs := make(RangeSet, 0)
 	for _, r := range seeds {
-		sl := make(Layers, 0)
-		rs := make(RangeSet, 0)
 		rs = append(rs, r)
-		sl = append(sl, rs)
-		minval := expand(&sl, 0)
-		fmt.Println(minval)
 	}
+	minval := expand(&rs, 0)
+	fmt.Println(minval)
 
 }
 
-func expand(sl *Layers, layer int) int {
-	rs := layers[layer]
-	if layer == len(layers)-1 {
+func expand(rs *RangeSet, layer int) int {
+	fmt.Println("l:", layer)
+	if layer == len(layers) {
 		result := math.MaxInt
-		for _, r := range rs {
+		for _, r := range *rs {
 			result = min(result, r.Start)
 		}
 		return result
 	}
-	for i := 0; i < len(rs); i++ {
-		// remove current range
-		for _, l := range layers {
-			// if overlap
-			// then add overlap to next layer
-			//      add remaining 0, 1, or 2 ranges to current layer
-			//      break
-			// else add current range to next layer
-			fmt.Println(l)
+	lrs := layers[layer]
+	nrs := make(RangeSet, 0) // hold next level range set
+	for len(*rs) > 0 {
+		nr := (*rs)[0]
+		*rs = (*rs)[1:] // remove current range
+		for i := 0; i < len(lrs); i++ {
+			lr := lrs[i]
+			if nr.Overlap(lr) {
+				var rrs RangeSet
+				nr, rrs = nr.Split(lr)
+				*rs = append(*rs, rrs...) // add remaining 0, 1, or 2 ranges to current layer
+				break
+			}
 		}
+		fmt.Println("nr:", nr)
+		nrs = append(nrs, nr)
 	}
 
-	return expand(sl, layer+1)
+	fmt.Println("nrs:", nrs)
+	return expand(&nrs, layer+1)
+}
+
+func (r Range) End() int {
+	return r.Start + r.Len - 1
+}
+
+func (r Range) Overlap(lr Range) bool {
+	if (r.Start <= lr.Start && r.End() >= lr.Start) ||
+		(lr.Start <= r.Start && lr.End() >= r.Start) {
+		return true
+	}
+	return false
+}
+
+func (r Range) Split(lr Range) (nr Range, rrs RangeSet) {
+	// assumes overlap = true
+	fmt.Println("r:", r, "lr:", lr)
+	start := max(r.Start, lr.Start)
+	end := min(r.End(), lr.End())
+	nr = Range{
+		Start: start + lr.Offset,
+		Len:   (end - start) + 1,
+	}
+	rrs = make(RangeSet, 0)
+	if r.Start < start {
+		rrs = append(rrs, Range{
+			Start: r.Start,
+			Len:   start - r.Start,
+		})
+	}
+	if r.End() > end {
+		rrs = append(rrs, Range{
+			Start: end + 1,
+			Len:   (r.End() - end),
+		})
+	}
+	fmt.Println("rrs:", rrs)
+	return nr, rrs
 }
