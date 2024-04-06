@@ -46,12 +46,8 @@ func (h *Hand) Rank() int {
 	r := 0
 
 	m := make(map[Card]int, 0)
-	cnt1, cnt2, cntJ := 0, 0, 0
+	cnt1, cnt2 := 1, 1
 	for _, c := range h.Cards {
-		if c.Value() == 1 {
-			cntJ++
-			continue
-		}
 		m[c] = m[c] + 1
 		if m[c] > cnt1 {
 			cnt1 = m[c]
@@ -62,8 +58,6 @@ func (h *Hand) Rank() int {
 			cnt1, cnt2 = cnt2, cnt1
 		}
 	}
-
-	cnt1 += cntJ
 
 	fmt.Println(m, cnt1, cnt2)
 
@@ -125,7 +119,7 @@ func init() {
 		'8': 8,
 		'9': 9,
 		'T': 11,
-		'J': 1,
+		'J': 12,
 		'Q': 13,
 		'K': 14,
 		'A': 15,
@@ -156,11 +150,12 @@ func main() {
 
 	slices.SortFunc(hands, cmpHand)
 
-	part2 := 0
+	part1 := 0
 	for i, h := range hands {
 		fmt.Println(h)
-		part2 += (i + 1) * h.Bid
+		part1 += (i + 1) * h.Bid
 	}
-	fmt.Println("Part 2: ", part2)
+	fmt.Println("Part 1: ", part1)
 
+	fmt.Println("Part 2: ", line)
 }
