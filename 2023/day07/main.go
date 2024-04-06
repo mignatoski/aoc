@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"slices"
-	"sort"
 )
 
 type Card rune
@@ -40,32 +39,64 @@ func (c Card) Value() int {
 	return cardValues[rune(c)]
 }
 
-func (h Hand) Rank() int {
+func (h *Hand) Rank() int {
 	if h.rank > 0 {
 		return h.rank
 	}
-
 	r := 0
+
+	m := make(map[Card]int, 0)
+	cnt1, cnt2 := 1, 1
+	for _, c := range h.Cards {
+		m[c] = m[c] + 1
+		if m[c] > cnt1 {
+			cnt1 = m[c]
+		} else if m[c] > cnt2 {
+			cnt2 = m[c]
+		}
+		if cnt1 < cnt2 {
+			cnt1, cnt2 = cnt2, cnt1
+		}
+	}
+
+	fmt.Println(m, cnt1, cnt2)
+
+	switch {
+	case cnt1 == 5:
+		r = 7
+	case cnt1 == 4:
+		r = 6
+	case cnt1 == 3 && cnt2 == 2:
+		r = 5
+	case cnt1 == 3:
+		r = 4
+	case cnt1 == 2 && cnt2 == 2:
+		r = 3
+	case cnt1 == 2:
+		r = 2
+	default:
+		r = 1
+	}
 
 	h.rank = r
 	return h.rank
 }
 
-func cmpHand(a, b Hand) int {
+func cmpHand(a, b *Hand) int {
 	r1 := a.Rank()
 	r2 := b.Rank()
 
 	switch {
 	case r1 < r2:
-		return 1
-	case r1 > r2:
 		return -1
+	case r1 > r2:
+		return 1
 	default:
 		for i := range 5 {
 			if a.Cards[i].Value() < b.Cards[i].Value() {
-				return 1
-			} else if a.Cards[i].Value() > b.Cards[i].Value() {
 				return -1
+			} else if a.Cards[i].Value() > b.Cards[i].Value() {
+				return 1
 			}
 		}
 		return 0
@@ -73,7 +104,7 @@ func cmpHand(a, b Hand) int {
 }
 
 var (
-	hands      []Hand
+	hands      []*Hand
 	cardValues map[rune]int
 )
 
@@ -96,11 +127,11 @@ func init() {
 }
 
 func main() {
-	inputFile, _ := os.Open("sample.txt")
+	inputFile, _ := os.Open("input.txt")
 	defer inputFile.Close()
 	fileScanner := bufio.NewScanner(inputFile)
 
-	hands = make([]Hand, 0)
+	hands = make([]*Hand, 0)
 	var line string
 	for fileScanner.Scan() {
 		line = fileScanner.Text()
@@ -112,17 +143,19 @@ func main() {
 		fmt.Sscanf(line, "%v %d", &c, &b)
 
 		ca := Cards(c)
-		sort.Sort(sort.Reverse(ca))
-		hands = append(hands, Hand{Cards: ca, Bid: b})
+		// cant sort due to second rule :( sort.Sort(sort.Reverse(ca))
+		hands = append(hands, &Hand{Cards: ca, Bid: b})
 
 	}
 
 	slices.SortFunc(hands, cmpHand)
 
-	for _, h := range hands {
+	part1 := 0
+	for i, h := range hands {
 		fmt.Println(h)
+		part1 += (i + 1) * h.Bid
 	}
-	fmt.Println("Part 1: ", line)
+	fmt.Println("Part 1: ", part1)
 
 	fmt.Println("Part 2: ", line)
 }
