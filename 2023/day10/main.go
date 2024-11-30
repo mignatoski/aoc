@@ -61,7 +61,7 @@ func (p Point) Ins() (a, b Point) {
 }
 
 func (p Point) Outs(prev Point) (a, b Point) {
-	fmt.Println(string(grid[p]))
+	// fmt.Println(string(grid[p]))
 	switch grid[p] {
 	case '|':
 		return p.Add(N), p.Add(S)
@@ -119,8 +119,10 @@ func main() {
 		fmt.Print("\n")
 	}
 	p1, p2 := start.Ins()
+	loop.Mark(p1)
+	loop.Mark(p2)
 	l1, l2 := start, start
-	fmt.Println(p1, p2)
+	// fmt.Println(p1, p2)
 
 	steps := 1
 	for p1 != p2 {
@@ -130,7 +132,7 @@ func main() {
 		n2 := p2.Next(l2)
 		l2 = p2
 		p2 = n2
-		fmt.Println(n1, n2)
+		// fmt.Println(n1, n2)
 		loop.Mark(n1)
 		loop.Mark(n2)
 		steps++
@@ -143,12 +145,23 @@ func main() {
 	for row := 0; row < y; row++ {
 		for col := range line {
 			if loop[Point{col, row}] {
-				fmt.Print("#")
+				fmt.Print(string(grid[Point{col, row}]))
 			} else {
 				fmt.Print(".")
 			}
 		}
 		fmt.Print("\n")
+	}
+
+	visited := make(LoopPipes)
+	p1, _ = start.Ins()
+
+	for p1 != start {
+		n1 := p1.Next(l1)
+		l1 = p1
+		p1 = n1
+		// fmt.Println(n1, n2)
+		visited.Mark(n1)
 	}
 
 	fmt.Println("Part 2: ", line)
